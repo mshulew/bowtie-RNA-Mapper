@@ -1,0 +1,81 @@
+R1:
+@NS500711:215:HHGG5BGXC:1:11101:18565:1050 1:N:0:GGCCTTGG+CGTCTGCC
+CAACGGGGCGAAGAAAAAAAAAAAAAAAAAAAAATTCACCGCAGCGGCG
++
+/AAAA/E//EEEEE/EEEEAEE6EEEAEE/////E/E//E/////////
+
+R2:
+@NS500711:215:HHGG5BGXC:1:11101:18565:1050 2:N:0:GGCCTTGG+CGTCTGCC
+GGAGAATAATTGGGGGTTGTGGGTGT
++
+//6<A/AE///A/////////////E
+
+debarcoded:
+@GGAGAATA_NS500711:215:HHGG5BGXC:1:11101:18565:1050 1:N:0:GGCCTTGG+CGTCTGCC
+CAACGGGGCGAAGAAAAAAAAAAAAAAAAAAAAATTCACCGCAGCGGCG
++
+/AAAA/E//EEEEE/EEEEAEE6EEEAEE/////E/E//E/////////
+
+star (BAM):
+ATAAGGGC_NS500711:215:HHGG5BGXC:2:12206:26008:3833      
+272     
+chr1    
+10067   
+0       
+5S43M   
+*       
+0       
+0       
+AACCTTAACAATAACCCTAACCCTAACCCTAACCCTAACCCTAACCCA 6///////A//AA/A////E///AEE6EE6EEEEE/AEE6E6EEAAAA        
+NH:i:5  HI:i:3  AS:i:38 nM:i:2
+
+umiTagging (BAM)
+NS500711:215:HHGG5BGXC:2:12206:26008:3833       
+272     
+chr1    
+10067   
+0       
+5S43M   
+*       
+0       
+0       
+AACCTTAACAATAACCCTAACCCTAACCCTAACCCTAACCCTAACCCA 
+6///////A//AA/A////E///AEE6EE6EEEEE/AEE6E6EEAAAA        
+NH:i:5  HI:i:3  AS:i:38 nM:i:2  XU:Z:ATAAGGGC
+
+dedup (BAM):
+NS500711:215:HHGG5BGXC:2:12206:26008:3833       
+272     
+chr1    
+10067   
+0       
+5S43M   
+*       
+0       
+0       
+AACCTTAACAATAACCCTAACCCTAACCCTAACCCTAACCCTAACCCA 
+6///////A//AA/A////E///AEE6EE6EEEEE/AEE6E6EEAAAA        
+NH:i:5  HI:i:3  AS:i:38 nM:i:2  XU:Z:ATAAGGGC
+
+
+umiTagging step:
+use split command to split into 100 files
+split -$(( $(wc -l bowtie.bam | cut -f1 -d ' ')/100 )) <(samtools view bowtie.bam) tmp/ --additional-suffix=.sam
+
+input (from star): Aligned.sortedByCoord.out.bam  Aligned.sortedByCoord.out.bam.bai
+script: samtools idxstats Aligned.sortedByCoord.out.bam | cut -f 1 | grep chr > ./Aligned.sortedByCoord.idxstats.txt
+   Aligned.sortedByCoord.idxstats.txt = list of all chromosomes
+script: mkdir -p tmp
+        python3.6 ~/SEQuoia-Complete/src/tagBamFile.py Aligned.sortedByCoord.out.bam Aligned.sortedByCoord.idxstats.txt tmp 16
+(this step moves umi tag from name to bam annotations) 
+        sambamba merge -t 16 Aligned.sortedByCoord.tagged.bam $(find tmp | grep chr)  
+(this step merges all bam files into a single bam)
+        sambamba index -t 16./Aligned.sortedByCoord.tagged.bam
+        
+ updated script:
+ samtools idxstats bowtie.bam | cut -f 1 | sed '$d' > bowtie.idxstats.txt
+ mkdir -p tmp
+ python3.6 ~/bowtie_aligner/src/tagBamFile.py bowtie.bam bowtie.idxstats.txt tmp 16
+ 
+
+

@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+# Update python verion and path to rRNA_mapper.py
+# Copy to directory in path
+# Make executable
+python3 ~/efs/bowtie-aligner/rRNA_mapper.py "$@"

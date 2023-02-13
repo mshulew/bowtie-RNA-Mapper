@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+# Update python verion and path to miRNA_mapper.py
+# Copy to directory in path
+# Make executable
+python3 ~/efs/bowtie-aligner/miRNA_mapper.py "$@"

@@ -1,0 +1,410 @@
+---
+title: "Bowtie Aligner Report"
+output: html_document
+params:
+  inDir: "NONE"
+  pipeline: "NONE"
+  rrna_reference_key: "NONE"
+  sample_index: "NONE"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(stringr)
+library(kableExtra)
+library(ggplot2)
+library(fastqcr)
+
+```
+
+```{r handle_files, include = FALSE}
+
+if(params$pipeline == "rRNA"){ 
+  pipeline_rrna <- TRUE
+} else {
+  pipeline_rrna <- FALSE
+}
+
+debarcodefiles <- list.files(params$inDir, recursive=TRUE, full.names=TRUE, include.dirs=FALSE, pattern=paste(params$sample_index,"debarcode",sep='_'))
+deduplication <- length(debarcodefiles) == 1
+
+pcr_duplicates <- 'ND'
+deduplicated_reads <- 'ND'
+
+```
+
+```{r qc_files, include = FALSE}
+
+fastqc <- paste(params$inDir,'fastqc',sep='/')
+qcFiles <- list.files(fastqc, full.names=TRUE)[grepl("zip",list.files(fastqc))]
+
+r1 <- qcFiles[grepl("_R1",qcFiles) & grepl(params$sample_index,qcFiles)]
+r2 <- qcFiles[grepl("_R2",qcFiles) & grepl(params$sample_index,qcFiles)]
+
+r1qc <- qc_read(r1, modules="Per base sequence quality")$per_base_sequence_quality
+if(length(r2) > 0){ 
+  r2_exists <- TRUE
+  r2qc <- qc_read(r2, modules="Per base sequence quality")$per_base_sequence_quality
+} else {
+  r2_exists <- FALSE
+}
+
+r1BasicStats <- qc_read(r1, modules="Basic Statistics")$basic_statistics
+fastqc_input_reads <- as.numeric(r1BasicStats$Value[r1BasicStats$Measure == 'Total Sequences'])
+
+```
+
+`r if(r2_exists) {"### Read QC {.tabset .tabset-fade}"}`
+`r if(!r2_exists) {"### Read QC"}`
+
+#### Read 1 (R1)
+
+```{r r1_graph, warning = FALSE, echo = FALSE}
+roundUpNice <- function(x, nice=c(1,2,4,5,6,8,10)) {
+  if(length(x) != 1) stop("'x' must be of length 1")
+  10^floor(log10(x)) * nice[[which(x <= 10^floor(log10(x)) * nice)[[1]]]]
+}
+r1plot <- ggplot(data = r1qc) + 
+  geom_line(mapping = aes(x = Base, y = Mean, group=1),size=1,color="blue") + 
+  labs(x="Position in read (bp)", y="Q Score") +
+  scale_x_discrete(limits=r1qc$Base,breaks=r1qc$Base[seq(0,length(r1qc$Base),by=2)],expand=c(0,0)) + 
+  scale_y_discrete(limits=c(0,roundUpNice(max(r1qc$Mean)),breaks=seq(0,roundUpNice(max(r1qc$Mean)),by=5)), expand=c(0,0)) +
+  annotate("rect", xmin=c(0), xmax=c(length(r1qc$Base)+1), ymin=c(0) ,ymax=c(20), alpha=0.2, fill="red") + 
+  annotate("rect", xmin=c(0), xmax=c(length(r1qc$Base)+1), ymin=c(20) ,ymax=c(28), alpha=0.2, fill="yellow") +
+  annotate("rect", xmin=c(0), xmax=c(length(r1qc$Base)+1), ymin=c(28) ,ymax=c(roundUpNice(max(r1qc$Mean))), alpha=0.2, fill="green") +
+  theme(axis.text.x = element_text(angle=-90))
+r1plot
+```
+
+`r if(r2_exists) {"#### Read 2"}`
+
+```{r r2_graph, warning=FALSE, echo=FALSE, eval=r2_exists}
+r2plot <- ggplot(data = r2qc) + 
+  geom_line(mapping = aes(x = Base, y = Mean, group=1),size=1,color="blue") + 
+  labs(x="Position in read (bp)", y="Q Score") +
+  scale_x_discrete(limits=r2qc$Base,breaks=r2qc$Base[seq(0,length(r2qc$Base),by=2)],expand=c(0,0)) + 
+  scale_y_discrete(limits=c(0,roundUpNice(max(r2qc$Mean)), breaks=seq(0,roundUpNice(max(r2qc$Mean)),by=5)),expand=c(0,0)) +
+  annotate("rect", xmin=c(0), xmax=c(length(r2qc$Base)+1), ymin=c(0) ,ymax=c(20), alpha=0.2, fill="red") + 
+  annotate("rect", xmin=c(0), xmax=c(length(r2qc$Base)+1), ymin=c(20) ,ymax=c(28), alpha=0.2, fill="yellow") +
+  annotate("rect", xmin=c(0), xmax=c(length(r2qc$Base)+1), ymin=c(28) ,ymax=c(roundUpNice(max(r2qc$Mean))), alpha=0.2, fill="green") +
+  theme(axis.text.x = element_text(angle=-90))
+  r2plot
+```
+
+`r if(!r2_exists) {"#### Single End Reads: No Read 2 (R2)"}`
+
+```{r pipeline_data, include = FALSE}
+
+# note: 'pipeline_info.tsv replaced with paste(params$sample_index,'pipeline_info.tsv',sep='_') in newest version (9/4/2020); same for all subsequent input files
+
+pipeline_data <- paste(params$inDir,'pipelineinfo',paste(params$sample_index,'pipeline_info.tsv',sep='_'),sep='/')
+pipeline_df <- read_tsv(pipeline_data)
+
+report_df <- pipeline_df
+report_df$Metric <- paste("##",report_df$Metric)
+
+names(pipeline_df)[1] <- ""
+names(pipeline_df)[2] <- ""
+
+```
+
+### Pipeline Metadata
+
+```{r print_pipelineInfo, echo = FALSE}
+knitr::kable(pipeline_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+```
+
+```{r add_total_input_reads, include = FALSE}
+
+input_df <- data.frame('Metric' = c('Total input reads'),'Value' = c(fastqc_input_reads))
+input_df$Value <- prettyNum(input_df$Value, big.mark=",", scientific=FALSE)
+report_df <- union(report_df, input_df)
+
+names(input_df)[1] <- ""
+names(input_df)[2] <- ""
+
+```
+
+### Pipeline input
+
+```{r print_pipelineInput, echo = FALSE}
+knitr::kable(input_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+```
+
+`r if(deduplication) {"### Debarcoding {.tabset .tabset-fade}"}`
+
+```{r prepare_deduplication_data, include=FALSE, eval=deduplication}
+
+bowtie_data <- paste(params$inDir,'bowtie',paste(params$sample_index,'bowtie.log',sep='_'),sep='/')
+bowtie_df <- read_delim(bowtie_data, ":", col_names=c("Metric","Value"))
+bowtie_df$Value <- as.numeric(gsub(",","",gsub("\\(.*","",bowtie_df$Value)))
+mapped_reads <- bowtie_df$Value[bowtie_df$Metric == '# reads with at least one reported alignment']
+
+debarcode_data <- paste(params$inDir,'debarcode',paste(params$sample_index,'debarcode_stats.txt',sep='_'),sep='/')
+debarcode_df <- read_tsv(debarcode_data, col_names=c("Metric","Value"))
+debarcode_df$Value <- prettyNum(debarcode_df$Value,big.mark = ',',scientific=FALSE)
+
+debarcode_df$Metric <- ifelse(debarcode_df$Metric == 'Total Reads', 'Input into debarcoding', debarcode_df$Metric) 
+debarcode_df$Metric <- ifelse(debarcode_df$Metric == 'Good Reads', 'Reads with valid UMI', debarcode_df$Metric)
+debarcode_df$Metric <- ifelse(debarcode_df$Metric == 'Bad Reads', 'Reads without valid UMI', debarcode_df$Metric)
+
+temp_data <- paste(params$inDir,'deduplication',paste(params$sample_index,'dedup.log',sep='_'),sep='/')
+temp_df <- read_tsv(temp_data,col_names=c("Entry"))
+
+dedup_input_reads <- temp_df$Entry[grep('unique_input_reads:',temp_df$Entry)] %>%
+  str_split(":")
+dedup_input_reads <- as.numeric(dedup_input_reads[[1]][2])
+
+output_reads <- temp_df$Entry[grep('unique_output_reads:',temp_df$Entry)] %>%
+  str_split(":")
+output_reads <- as.numeric(output_reads[[1]][2])
+
+dedup_rate = paste(as.character(round((1 - output_reads/mapped_reads)*100,digits=2)),"%",sep="")
+
+# deduplication_df[nrow(deduplication_df) + 1,] = list('Unique (deduplicated) reads',prettyNum(output_reads,big.mark=','))
+# deduplication_df[nrow(deduplication_df) + 1,] = list('PCR Duplicates',as.character(dedup_rate))
+
+deduplicated_reads <- prettyNum(output_reads,big.mark=",")
+pcr_duplicates <- dedup_rate
+
+report_df <- union(report_df, debarcode_df)
+
+names(debarcode_df)[1] <- ""
+names(debarcode_df)[2] <- ""
+
+```
+
+```{r print_debarcode_data, echo=FALSE, eval=deduplication}
+
+knitr::kable(debarcode_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+
+```
+
+
+```{r prepare_trimming_data, include = FALSE}
+
+cutadapt_data <- paste(params$inDir,'cutadapt',paste(params$sample_index,'cutadapt.log',sep='_'),sep='/')
+cutadapt_df <- read_delim(cutadapt_data, ":", col_names=c("Metric","Value"))
+
+cutadapt_df$Value <- as.numeric(gsub(",","",gsub("\\(.*","",cutadapt_df$Value)))
+
+cutadapt_input_reads <- cutadapt_df$Value[grep("Total read.*processed",cutadapt_df$Metric)]
+passing_filters <- cutadapt_df$Value[grep("*(passing filters)",cutadapt_df$Metric)]
+reads_too_short <- cutadapt_df$Value[grep("*that were too short",cutadapt_df$Metric)]
+percent_reads_too_short <- paste(round((reads_too_short/cutadapt_input_reads) * 100,1),'%',sep='')
+
+trimming_df <- data.frame('Metric' = c('Input into trimming',
+                                       'Reads passing filters',
+                                       'Reads that were too short'),
+                          'Value' = c(cutadapt_input_reads,
+                                      passing_filters,
+                                      reads_too_short))
+                          
+trimming_df$Value <- prettyNum(trimming_df$Value, big.mark=",", scientific=FALSE)
+
+percent_df <- data.frame('Metric' = 'Percent reads that were too short',
+                         'Value' = percent_reads_too_short)
+
+trimming_df <- union(trimming_df, percent_df)
+  
+report_df <- union(report_df, trimming_df)
+
+names(trimming_df)[1] <- ""
+names(trimming_df)[2] <- ""
+
+```
+
+### Trimming
+
+```{r print_trimming, echo = FALSE}
+knitr::kable(trimming_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+```
+
+```{r prepare_bowtie_data, include = FALSE}
+
+bowtie_data <- paste(params$inDir,'bowtie',paste(params$sample_index,'bowtie.log',sep='_'),sep='/')
+bowtie_df <- read_delim(bowtie_data, ":", col_names=c("Metric","Value"))
+bowtie_df$Value <- as.numeric(gsub(",","",gsub("\\(.*","",bowtie_df$Value)))
+
+input_to_aligner <- bowtie_df$Value[bowtie_df$Metric == '# reads processed']
+mapped_reads <- bowtie_df$Value[bowtie_df$Metric == '# reads with at least one reported alignment']
+percent_mapped_reads <- paste(round((mapped_reads/input_to_aligner) * 100,1),'%',sep='')
+unmapped_reads <-  bowtie_df$Value[bowtie_df$Metric == '# reads that failed to align']
+percent_unmapped_reads <- paste(round((unmapped_reads/input_to_aligner) * 100,1),'%',sep='')
+
+alignment_df <- data.frame('Metric' = c('Input to aligner',
+                                        'Mapped to reference',
+                                        'Percent mapped to reference',
+                                        'Unmapped reads',
+                                        'Percent unmapped reads',
+                                        'Unique (deduplicated) reads',
+                                        'PCR duplicates'),
+                           'Value' = c(format(input_to_aligner,scientific=F),
+                                       mapped_reads,
+                                       percent_mapped_reads,
+                                       unmapped_reads,
+                                       percent_unmapped_reads,
+                                       deduplicated_reads,
+                                       pcr_duplicates))
+                                       
+alignment_df$Value <- prettyNum(alignment_df$Value,big.mark=",")
+
+report_df <- union(report_df, alignment_df)
+
+names(alignment_df)[1] <- ""
+names(alignment_df)[2] <- ""
+
+```
+
+### Alignment
+
+```{r print_alignment, echo = FALSE}
+knitr::kable(alignment_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+```
+
+```{r prepare_rna_stats, include = FALSE}
+
+rnastats_data <- paste(params$inDir,'counts',paste(params$sample_index,'RNAstats.tsv',sep='_'),sep='/')
+rnastats_df <- read_tsv(rnastats_data, col_names=c("Metric","Value"))
+
+reads_mapping_to_rna <- rnastats_df$Value[rnastats_df$Metric == 'Total number of reads mapping to an RNA']
+percent_reads_mapping <- paste(round((reads_mapping_to_rna/fastqc_input_reads) * 100,1),'%',sep='')
+rnas_detected <- rnastats_df$Value[rnastats_df$Metric == 'Total number of RNAs detected']
+reads_mapping_to_rna_threshold <- rnastats_df$Value[grepl('Total number of reads mapping to an RNA with >=', rnastats_df$Metric)]
+percent_reads_mapping_threshold <- paste(round((reads_mapping_to_rna_threshold/fastqc_input_reads) * 100,1),'%',sep='')
+rnas_detected_threshold <- rnastats_df$Value[grepl('Total number of RNAs with >=', rnastats_df$Metric)]
+
+threshold <- gsub(' reads','',(gsub('.*>=','',rnastats_df$Metric[grepl('Total number of reads mapping to an RNA with >=', rnastats_df$Metric)])))
+
+rnastats_df <- data.frame('Metric' = c('Total number of reads mapping to an RNA',
+                                       'Percent reads mapping to an RNA',
+                                       'Total RNAs detected',
+                                       paste('Total number of reads mapping to an RNA with >=',threshold,' reads',sep=''),
+                                       paste('Percent of reads mapping to an RNA with >=',threshold,' reads',sep=''),
+                                       paste('Total number of RNAs with >=',threshold,' reads detected',sep='')),
+                          'Value' = c(reads_mapping_to_rna,
+                                      percent_reads_mapping,
+                                      rnas_detected,
+                                      reads_mapping_to_rna_threshold,
+                                      percent_reads_mapping_threshold,
+                                      rnas_detected_threshold))
+
+rnastats_df$Value <- prettyNum(rnastats_df$Value,big.mark=",")
+
+report_df <- union(report_df,rnastats_df)
+
+names(rnastats_df)[1] <- ""
+names(rnastats_df)[2] <- ""
+
+```
+
+### RNA stats
+
+```{r print_rnastats, echo = FALSE}
+knitr::kable(rnastats_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+```
+
+```{r process_rrna_data, include=FALSE, eval=pipeline_rrna}
+
+rrna_data <- paste(params$inDir,'counts',paste(params$sample_index,'gene_counts_rpkmtpm.tsv',sep='_'),sep='/')
+rrna_df <- read_tsv(rrna_data) %>%
+  select(-Chr, -Start, -End, -Strand, -Length) %>%
+  mutate(rRNA_biotype = NA)
+
+rrna_reference_key_df <- read_tsv(params$rrna_reference_key)
+
+for(a in 1:nrow(rrna_reference_key_df)){
+  fasta_name = as.character(rrna_reference_key_df[a,1])
+  report_name = as.character(rrna_reference_key_df[a,2])
+  biotype = as.character(rrna_reference_key_df[a,3])
+  rrna_df$Geneid <- ifelse(rrna_df$Geneid == fasta_name,report_name,rrna_df$Geneid)
+  rrna_df$rRNA_biotype <- ifelse(rrna_df$Geneid == report_name,biotype,rrna_df$rRNA_biotype)
+}
+
+rrna_biotypes_df <- rrna_reference_key_df %>%
+  select(type) %>%
+  distinct(type,.keep_all=TRUE) %>%
+  rename(rRNA_biotype = type) %>%
+  mutate(percent_total_reads = 0) %>%
+  mutate(counts = 0)
+
+for(b in 1:nrow(rrna_biotypes_df)){
+  biotype = as.character(rrna_biotypes_df$rRNA_biotype[b])
+  df <- rrna_df %>%
+    filter(rRNA_biotype == biotype)
+  rrna_biotypes_df$counts[b] = sum(df$counts)
+  percent_total = round(sum((df$counts)/fastqc_input_reads)*100,digits=2)
+  rrna_biotypes_df$percent_total_reads[b] = paste(as.character(percent_total),"%",sep="")
+}
+
+rrna_df$counts <- prettyNum(rrna_df$counts,big.mark=',',scientific=FALSE)
+rrna_biotypes_df$counts <- prettyNum(rrna_biotypes_df$counts,big.mark=',')
+
+```
+
+`r if(pipeline_rrna) {"### rRNA"}`
+
+```{r print_rrna_data, echo=FALSE, eval=pipeline_rrna}
+
+knitr::kable(rrna_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+
+
+knitr::kable(rrna_biotypes_df) %>%
+  kable_styling(bootstrap_options = c("striped"), font_size = 12, full_width = T)
+
+```
+
+```{r add_rrna_to_report, include=FALSE, eval=pipeline_rrna}
+
+report_df <- report_df %>%
+  mutate(rpkm = "") %>%
+  mutate(tpm = "") %>%
+  mutate(rRNA_biotype = "")
+
+rrna_df <- rrna_df %>%
+  rename(Value = counts) %>%
+  rename(Metric = Geneid)
+
+rrna_df$Value <- prettyNum(rrna_df$Value,big.mark=',')
+
+rrna_df = rbind(c("rRNA","counts","rpkm","tpm","rRNA biotype"),rrna_df)
+rrna_df = rbind(c("#","#","#","#","#"),rrna_df)
+
+rrna_biotypes_df = rbind(c("rRNA biotype","Percent of total","counts"),rrna_biotypes_df)
+rrna_biotypes_df = rbind(c("#","#","#"),rrna_biotypes_df)
+
+rrna_biotypes_df <- rrna_biotypes_df %>%
+  rename(Metric = rRNA_biotype) %>%
+  rename(Value = percent_total_reads) %>%
+  rename(rpkm = counts) %>%
+  mutate(tpm = "") %>%
+  mutate(rRNA_biotype = "")
+
+report_df <- union(report_df,rrna_df)
+report_df <- union(report_df,rrna_biotypes_df)
+
+names(report_df)[3] <- ""
+names(report_df)[4] <- ""
+names(report_df)[5] <- ""
+
+```
+
+```{r write_to_file, include=FALSE}
+
+write.table(report_df,
+            paste(params$sample_index,'report.tsv',sep='_'), 
+            sep="\t", 
+            col.names=FALSE, 
+            row.names=FALSE,
+            quote=FALSE)
+
+```

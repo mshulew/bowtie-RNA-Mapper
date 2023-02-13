@@ -1,0 +1,95 @@
+
+{
+	"parameters": [
+		{
+			"name": "reads",
+			"label": "Path to fastq reads",
+			"usage": "Must be wrapped in single quotes. R{1,2} must be specified if --skipUmi is not selected",
+			"type": "string",
+			"renderer": "file",
+			"group": "invisible",
+			"pattern": ".*(R1_*\\.fastq\\.gz$|R2_*\\.fastq\\.gz$)",
+			"required": true
+
+		},
+		{
+			"name": "refs",
+			"label": "Reference file base path",
+			"usage": "Reference files",
+			"type": "string",
+			"renderer": "file",
+			"group": "invisible",
+			"required": true
+		},
+		{
+			"name": "bowtie_fa",
+			"label": "fasta reference file",
+			"usage": "Path to fasta file of reference sequences",
+			"type": "string",
+			"renderer": "file",
+			"default_value": "./results",
+			"group": "invisible"
+		},
+		{
+			"name": "pipeline",
+			"label": "analysis pipeline",
+			"usage": "miRNA or rRNA",
+			"type": "string",
+			"renderer": "file",
+			"default_value": "./results",
+			"group": "invisible"
+		},
+		{
+			"name": "outDir",
+			"label": "Output path",
+			"usage": "Indicate the output directory to write to",
+			"type": "string",
+			"renderer": "file",
+			"default_value": "./results",
+			"group": "invisible"
+		},
+		{
+			"name": "skipUmi",
+			"label": "Skip UMI processing",
+			"usage": "Indicate that only R1 has been passed in and no UMI processing is required",
+			"type": "boolean",
+			"renderer": "check-box",
+			"default_value": false,
+			"group": "options"
+		},
+		{
+			"name": "reverseStrand",
+			"label": "Is the libarary reverse stranded?",
+			"usage": "Indicate if your library is reverse stranded",
+			"type": "boolean",
+			"renderer": "check-box",
+			"default_value": false,
+			"group": "invisible"
+		},
+		{
+			"name": "noTrim",
+			"label": "Skip read trimming?",
+			"usage": "Indicates whether or not trimming skipped on the reads",
+			"type": "boolean",
+			"renderer": "check-box",
+			"default_value": false,
+			"group": "advanced"
+		},
+		{
+			"name": "max_cpus",
+			"label": "Max CPUs",
+			"usage": "The max number of cpus the pipeline may use. Defaults provided by -profile.",
+			"type": "integer",
+			"renderer": "range",
+			"group": "invisible"
+		},
+		{
+			"name": "max_memory",
+			"label": "Max Memory",
+			"usage": "The max memory in GB that the pipeline may use. Defaults provided by -profile.",
+			"type": "integer",
+			"renderer": "range",
+			"group": "invisible"
+		}
+	]
+}
