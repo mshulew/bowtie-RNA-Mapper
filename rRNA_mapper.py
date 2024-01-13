@@ -97,9 +97,6 @@ if __name__ == "__main__":
         cl_options = cl_options + ' --noTrim'    
         
     cmd = "NXF_VER=22.10.0 nextflow run {} -profile docker --inDir {} --outDir {} --pipeline rRNA {}".format(ref_dir + '/main.nf',tmp_dir,output_dir,cl_options)
-    print('*'*10)
-    print('command line executed: {}'.format(cmd))
-    print('*'*10)
     process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
     process.wait()
     

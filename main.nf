@@ -371,7 +371,7 @@ process featureCounts {
   
   output:
   set val (sample_id), file('*_gene_counts') into counts_ch
-  file '*.featureCounts.bam'
+  file '*.featureCounts.bam*'
   file '*_gene_counts.summary' into counts_summary_ch
   
   script:
@@ -383,6 +383,7 @@ process featureCounts {
     -a $bowtiegtf \
     -o ./${sample_id}_gene_counts \
     -R BAM ${bam}
+  sambamba index -t $task.cpus ${bam}.featureCounts.bam
   """
 }
   
