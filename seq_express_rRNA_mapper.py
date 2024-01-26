@@ -24,7 +24,7 @@ if __name__ == "__main__":
     output_dir = os.getcwd()
     trimming = True
     ref_dir = '~/efs/bowtie-aligner'
-    skipumi = False
+    skipumi = True
     umiType = 'R2'
     reversestrand = False
     fracoverlap = '0'
@@ -37,7 +37,7 @@ if __name__ == "__main__":
             print('Usage: ' + os.path.basename(__file__) + ' --I [input filename] --O [output directory name]')
             print('Options: --umiType --genome --reverseStrand --noTrim --skipUmi')  
             print('--umiType for UMI location (R1, R2 or none; default is R1)')
-            print('--skipUmi to skip UMI deduplication')
+            print('--allowUmi to allow UMI deduplication')
             print('--SE for single end reads; default is paired end reads')
             print('--genome to select species (hg38, mm10, rnor6; default is hg38)')
             print('--noTrim to turn off poly A trimming and removal of first 5 prime base')
@@ -72,8 +72,8 @@ if __name__ == "__main__":
                     reversestrand = True
                 if sys.argv[a] == '--noTrim':
                     trimming = False
-                if sys.argv[a] == '--skipUmi':
-                    skipumi = True
+                if sys.argv[a] == '--allowUmi':
+                    skipumi = False
                 if sys.argv[a] == '--SE':
                     singleend = True
 
@@ -117,7 +117,8 @@ if __name__ == "__main__":
     if singleend:
         cl_options = cl_options + ' --SE' 
 
-    cmd = "nextflow run {} -profile docker --inDir {} --outDir {} {}".format(ref_dir + '/bowtie-express.nf',tmp_dir,output_dir,cl_options)
+    cmd = "NXF_VER=22.10.0 nextflow run {} -profile docker --inDir {} --outDir {} {}".format(ref_dir + '/bowtie-express.nf',tmp_dir,output_dir,cl_options)
+    print(cmd)
     process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
     process.wait()
 
