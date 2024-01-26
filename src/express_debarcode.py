@@ -49,11 +49,11 @@ if __name__ == "__main__":
                 print('@{}_{}'.format(barcode,input_file_data[a].split('\t')[0][1:]))
                 print('@{}_{}'.format(barcode,input_file_data[a].split('\t')[1][1:]))
                 print(input_file_data[a+1].split('\t')[0])
-                print(input_file_data[a+1].split('\t')[1][8:])
+                print(input_file_data[a+1].split('\t')[1])
                 print(input_file_data[a+2].split('\t')[0])
                 print(input_file_data[a+2].split('\t')[1])
                 print(input_file_data[a+3].split('\t')[0])
-                print(input_file_data[a+3].split('\t')[1][8:])
+                print(input_file_data[a+3].split('\t')[1])
 
         else:
             bad_counter += 1
