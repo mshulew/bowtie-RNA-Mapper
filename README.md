@@ -1,9 +1,11 @@
-# bowtie-aligner
-- Maps reads from fastq files against a fasta file of RNAs  
+# Bowtie RNA Mapper
+- Uses Bowtie to align reads to miRNAs, rRNAs or any other RNA supplied
+- Default is for Bio-Rad SEQuoia Complete & SEQuoia Express chemistries but compatible with other chemistries 
+- Maps reads from FASTQ files against a fasta file of RNAs  
 - Can be used to map to miRNAs, rRNAs or any other RNA with a known sequence  
 - Accepts compressed (.fastq.gz) and uncompressed (.fastq) files  
-- When using UMI deduplication, must supply R1 & R2 file  
-- When skipping UMI deduplication, will ignore R2 file  
+- Handles UMI deduplication for 8bp UMIs on the 5' end of R2  
+- When skipping UMI deduplication, will ignore R2 file
 
 ## rRNA mapper
 map reads to rRNAs  
